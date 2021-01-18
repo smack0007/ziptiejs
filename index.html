@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Data Binding Test</title>
+    </head>
+    <body>
+        <div id="app">
+            <h1 :innerHTML="name" @click="onClick"></h1>
+            <span :innerHtml="clickCount"></span>
+        </div>
+        <script type="text/javascript">
+            function buildAttributeNameMap() {
+                const typesToScan = [
+                    EventTarget.prototype,
+                    Node.prototype,
+                    Element.prototype,
+                    HTMLElement.prototype
+                ];
+                
+                const map = {};
+
+                for (const type of typesToScan) {
+                    for (const key of Object.keys(type)) {
+                        map[key.toLowerCase()] = key;
+                    }
+                }
+
+                return map;
+            }
+            
+            const attributeNameMap = buildAttributeNameMap();
+
+            function bind(view, model, parent) {
+                if (typeof view === "string") {
+                    view = document.querySelector(view);
+                }
+
+                console.info("bind", view);
+
+                let context = view["z-context"];
+
+                if (context === undefined) {
+                    console.info("context not found...");
+
+                    const viewBindings = {};
+
+                    context = {
+                        parent,
+                        view,
+                        viewBindings,
+                        model,
+                        getRoot: function(params) {  
+                            let root = this;
+
+                            while (root.parent !== undefined) {
+                                root = root.parent;
+                            }
+
+                            return root;
+                        },
+                        updateView: function() {
+                            console.info('updateView', this);
+
+                            for (const viewKey of Object.keys(this.viewBindings)) {
+                                this.view[viewKey] = this.model[this.viewBindings[viewKey]];
+                            }
+
+                            for (const child of this.view.children) {
+                                bind(child, model, this);
+                            }
+                        }
+                    };
+
+                    for (const attribute of view.attributes) {
+                        if (attribute.name.startsWith(":")) {
+                            viewBindings[attributeNameMap[attribute.name.substring(1)]] = attribute.value;
+                        }
+
+                        if (attribute.name.startsWith("@")) {
+                            const eventName = "on" + attribute.name.substring(1);
+                            
+                            const eventHandler = function(...args) {
+                                model[attribute.value](...args);
+                                context.getRoot().updateView();
+                            };
+                            
+                            view[attributeNameMap[eventName]] = eventHandler;
+                        }
+                    }
+
+                    view["z-context"] = context;
+                }
+
+                context.updateView();
+            }
+
+            bind("#app", {
+                name: "Zachary Snow",
+                clickCount: 0,
+                onClick: function() {
+                    this.clickCount++;
+                    console.info("Hello " + this.name, this.clickCount);
+                }
+            });
+        </script>
+    </body>
+</html>
