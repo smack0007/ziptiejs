@@ -8,6 +8,7 @@
     "skipLibCheck": true,                     
     "forceConsistentCasingInFileNames": true,
     "rootDir": "./src",
-    "sourceMap": true
-  },
+    "sourceMap": true,
+    "removeComments": true
+  }
 }

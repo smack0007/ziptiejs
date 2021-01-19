@@ -1,37 +1,39 @@
-type AttributeNameMap = { [key: string]: string };
-
-enum BindingType {
-    value,
-
-    list
-}
-
-interface Binding {
-    type: BindingType;
-
-    source: string;
-}
-
-interface ListBinding extends Binding {
-    listVariable: string;
-    
-    listItems: HTMLElement[];
-}
-
-type BindingsMap = { [key: string]: Binding };
-
-interface BindingTreeNode {
-    parent: BindingTreeNode | undefined;
-
-    getRoot(): BindingTreeNode;
-
-    updateView(): void;
-}
-
 const ZipTie = (function(){
     //
     // Internal API
     //
+
+    type AttributeNameMap = { [key: string]: string };
+
+    enum BindingType {
+        value,
+
+        list
+    }
+
+    interface Binding {
+        type: BindingType;
+
+        source: string;
+    }
+
+    interface ListBinding extends Binding {
+        listVariable: string;
+        
+        listItems: HTMLElement[];
+    }
+
+    type BindingsMap = { [key: string]: Binding };
+
+    interface BindingTreeNode {
+        parent: BindingTreeNode | undefined;
+
+        children: BindingTreeNode[];
+
+        getRoot(): BindingTreeNode;
+
+        updateView(): void;
+    }
 
     const _attributeNameMap = (function(): AttributeNameMap {
         const typesToScan = [
@@ -53,8 +55,9 @@ const ZipTie = (function(){
     })();
 
     const _createBindingTreeNode = function(parent: BindingTreeNode | undefined, updateView: () => void): BindingTreeNode {
-        return {
+        const node = {
             parent,
+            children: [],
             updateView,
             getRoot: function() {  
                 let root = this;
@@ -66,6 +69,12 @@ const ZipTie = (function(){
                 return root;
             }
         } as BindingTreeNode;
+
+        if (parent !== undefined) {
+            parent.children.push(node);
+        }
+
+        return node;
     };
 
     const _bind = function(view: HTMLElement, model: any, parent?: BindingTreeNode): void {
@@ -99,14 +108,8 @@ const ZipTie = (function(){
                     }
                 }
 
-                for (let i = 0; i < view.childNodes.length; i++) {
-                    const childNode = view.childNodes[i];
-
-                    if (childNode.nodeType === Node.ELEMENT_NODE) {
-                        _bind(childNode as HTMLElement, model, context);
-                    } else if (childNode.nodeType === Node.TEXT_NODE) {
-                        _bindText(childNode as Text, model, context);
-                    }
+                for (const child of context.children) {
+                    child.updateView();
                 }
             });
 
@@ -142,6 +145,16 @@ const ZipTie = (function(){
                     (view as any)[_attributeNameMap[eventName]] = eventHandler;
                 }
             }
+
+            for (let i = 0; i < view.childNodes.length; i++) {
+                const childNode = view.childNodes[i];
+
+                if (childNode.nodeType === Node.ELEMENT_NODE) {
+                    _bind(childNode as HTMLElement, model, context);
+                } else if (childNode.nodeType === Node.TEXT_NODE) {
+                    _bindText(childNode as Text, model, context);
+                }
+            }
         }
 
         context.updateView();
@@ -154,6 +167,7 @@ const ZipTie = (function(){
             text = view.textContent.trim();
         }
 
+        // TODO: Add support for multiple placeholders
         if (!text.startsWith("{{") || !text.endsWith("}}")) {
             return;
         }
@@ -161,10 +175,8 @@ const ZipTie = (function(){
         let context = (view as any)["z-context"] as BindingTreeNode;
 
         if (context === undefined) {
-            // TODO: The {{ }} will only be replaced one time. We need to remember this somehow.
-
+            const key = text.substring("{{".length, text.length - "}}".length).trim();
             context = _createBindingTreeNode(parent, function() {
-                const key = text.substring("{{".length, text.length - "}}".length).trim();
                 view.textContent = model[key];
             });
         }
@@ -196,7 +208,9 @@ const ZipTie = (function(){
         view[key] = model[binding.source];
     };
 
+    //
     // Public API
+    //
 
     return {
         bind: function(view: HTMLElement | string, model: any, parent?: any): void {
