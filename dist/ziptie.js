@@ -5,7 +5,9 @@ var BindingType;
     BindingType[BindingType["list"] = 1] = "list";
 })(BindingType || (BindingType = {}));
 const ZipTie = (function () {
+    //
     // Internal API
+    //
     const _attributeNameMap = (function () {
         const typesToScan = [
             EventTarget.prototype,
@@ -21,47 +23,55 @@ const ZipTie = (function () {
         }
         return map;
     })();
+    const _createBindingTreeNode = function (parent, updateView) {
+        return {
+            parent,
+            updateView,
+            getRoot: function () {
+                let root = this;
+                while (root.parent !== undefined) {
+                    root = root.parent;
+                }
+                return root;
+            }
+        };
+    };
     const _bind = function (view, model, parent) {
         let context = view["z-context"];
         if (context === undefined) {
-            context = {
-                parent,
-                view,
-                model,
-                bindings: {},
-                getRoot: function () {
-                    let root = this;
-                    while (root.parent !== undefined) {
-                        root = root.parent;
-                    }
-                    return root;
-                },
-                updateView: function () {
-                    for (const key of Object.keys(this.bindings)) {
-                        switch (this.bindings[key].type) {
-                            case BindingType.value:
-                                _updateValueBinding(this.view, this.model, key, this.bindings[key]);
-                                break;
-                            case BindingType.list:
-                                _updateListBinding(this.view, this.model, key, this.bindings[key]);
-                                break;
-                        }
-                    }
-                    for (const child of this.view.children) {
-                        _bind(child, model, this);
+            const bindings = {};
+            context = _createBindingTreeNode(parent, function () {
+                for (const key of Object.keys(bindings)) {
+                    switch (bindings[key].type) {
+                        case BindingType.value:
+                            _updateValueBinding(context, view, model, key, bindings[key]);
+                            break;
+                        case BindingType.list:
+                            _updateListBinding(context, view, model, key, bindings[key]);
+                            break;
                     }
                 }
-            };
+                for (let i = 0; i < view.childNodes.length; i++) {
+                    const childNode = view.childNodes[i];
+                    if (childNode.nodeType === Node.ELEMENT_NODE) {
+                        _bind(childNode, model, context);
+                    }
+                    else if (childNode.nodeType === Node.TEXT_NODE) {
+                        _bindText(childNode, model, context);
+                    }
+                }
+            });
+            view["z-context"] = context;
             for (let i = 0; i < view.attributes.length; i++) {
                 const attribute = view.attributes[i];
                 if (attribute.name.startsWith(":")) {
-                    context.bindings[_attributeNameMap[attribute.name.substring(1)]] = {
+                    bindings[_attributeNameMap[attribute.name.substring(1)]] = {
                         type: BindingType.value,
                         source: attribute.value
                     };
                 }
                 if (attribute.name.startsWith("%")) {
-                    context.bindings[_attributeNameMap[attribute.name.substring(1)]] = {
+                    bindings[_attributeNameMap[attribute.name.substring(1)]] = {
                         type: BindingType.list,
                         source: attribute.value,
                         listVariable: attribute.name.substring(1),
@@ -77,11 +87,28 @@ const ZipTie = (function () {
                     view[_attributeNameMap[eventName]] = eventHandler;
                 }
             }
-            view["z-context"] = context;
         }
         context.updateView();
     };
-    const _updateListBinding = function (view, model, key, binding) {
+    const _bindText = function (view, model, parent) {
+        let text = "";
+        if (view.textContent) {
+            text = view.textContent.trim();
+        }
+        if (!text.startsWith("{{") || !text.endsWith("}}")) {
+            return;
+        }
+        let context = view["z-context"];
+        if (context === undefined) {
+            // TODO: The {{ }} will only be replaced one time. We need to remember this somehow.
+            context = _createBindingTreeNode(parent, function () {
+                const key = text.substring("{{".length, text.length - "}}".length).trim();
+                view.textContent = model[key];
+            });
+        }
+        context.updateView();
+    };
+    const _updateListBinding = function (context, view, model, key, binding) {
         if (view.parentElement === null) {
             return;
         }
@@ -93,11 +120,11 @@ const ZipTie = (function () {
             view.parentElement.appendChild(view.content.cloneNode(true));
             const listItem = view.parentElement.lastElementChild;
             binding.listItems.push(listItem);
-            model = Object.assign(Object.assign({}, model), { [binding.listVariable]: value });
-            _bind(listItem, model, view.parentElement);
+            const listItemModel = Object.assign(Object.assign({}, model), { [binding.listVariable]: value });
+            _bind(listItem, listItemModel, context);
         }
     };
-    const _updateValueBinding = function (view, model, key, binding) {
+    const _updateValueBinding = function (context, view, model, key, binding) {
         view[key] = model[binding.source];
     };
     // Public API
