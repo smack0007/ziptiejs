@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Data Binding Test</title>
+    </head>
+    <body>
+        <div id="app">
+            <h1 :innerHTML="name" @click="onClick"></h1>
+            <span :innerHtml="clickCount"></span>
+        </div>
+        <script type="text/javascript" src="../dist/ziptie.js"></script>        
+        <script type="text/javascript">
+            bind("#app", {
+                name: "Zachary Snow",
+                clickCount: 0,
+                onClick: function() {
+                    this.clickCount++;
+                    console.info("Hello " + this.name, this.clickCount);
+                }
+            });
+        </script>
+    </body>
+</html>
