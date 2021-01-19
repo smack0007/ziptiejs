@@ -1,5 +1,13 @@
 const ZipTie = (function(){
     //
+    // Constants
+    //
+
+    const BINDING_TREE_NODE_PROPERTY = "z-bind";
+    const OPEN_PLACEHOLDER = "{{";
+    const CLOSE_PLACEHOLDER = "}}";
+
+    //
     // Internal API
     //
 
@@ -32,7 +40,7 @@ const ZipTie = (function(){
 
         getRoot(): BindingTreeNode;
 
-        updateView(): void;
+        update(): void;
     }
 
     const _attributeNameMap = (function(): AttributeNameMap {
@@ -54,11 +62,11 @@ const ZipTie = (function(){
         return map;
     })();
 
-    const _createBindingTreeNode = function(parent: BindingTreeNode | undefined, updateView: () => void): BindingTreeNode {
+    const _createBindingTreeNode = function(parent: BindingTreeNode | undefined, update: () => void): BindingTreeNode {
         const node = {
             parent,
             children: [],
-            updateView,
+            update,
             getRoot: function() {  
                 let root = this;
 
@@ -78,7 +86,7 @@ const ZipTie = (function(){
     };
 
     const _bind = function(view: HTMLElement, model: any, parent?: BindingTreeNode): void {
-        let context = (view as any)["z-context"] as BindingTreeNode;
+        let context = (view as any)[BINDING_TREE_NODE_PROPERTY] as BindingTreeNode;
 
         if (context === undefined) {
             const bindings: BindingsMap = {};
@@ -109,11 +117,15 @@ const ZipTie = (function(){
                 }
 
                 for (const child of context.children) {
-                    child.updateView();
+                    child.update();
+                }
+
+                if (context.parent === undefined) {
+                    console.debug(context);
                 }
             });
 
-            (view as any)["z-context"] = context;
+            (view as any)[BINDING_TREE_NODE_PROPERTY] = context;
 
             for (let i = 0; i < view.attributes.length; i++) {
                 const attribute = view.attributes[i];
@@ -139,7 +151,7 @@ const ZipTie = (function(){
                     
                     const eventHandler = function(...args: any[]) {
                         model[attribute.value](...args);
-                        context.getRoot().updateView();
+                        context.getRoot().update();
                     };
                     
                     (view as any)[_attributeNameMap[eventName]] = eventHandler;
@@ -157,7 +169,7 @@ const ZipTie = (function(){
             }
         }
 
-        context.updateView();
+        context.update();
     };
 
     const _bindText = function(view: Text, model: any, parent: BindingTreeNode): void {
@@ -168,29 +180,34 @@ const ZipTie = (function(){
         }
 
         // TODO: Add support for multiple placeholders
-        if (!text.startsWith("{{") || !text.endsWith("}}")) {
+        if (!text.startsWith(OPEN_PLACEHOLDER) || !text.endsWith(CLOSE_PLACEHOLDER)) {
             return;
         }
         
-        let context = (view as any)["z-context"] as BindingTreeNode;
+        let context = (view as any)[BINDING_TREE_NODE_PROPERTY] as BindingTreeNode;
 
         if (context === undefined) {
-            const key = text.substring("{{".length, text.length - "}}".length).trim();
+            const key = text.substring(OPEN_PLACEHOLDER.length, text.length - CLOSE_PLACEHOLDER.length).trim();
             context = _createBindingTreeNode(parent, function() {
                 view.textContent = model[key];
             });
         }
 
-        context.updateView();
+        context.update();
     };
 
-    const _updateListBinding = function(context: BindingTreeNode, view: HTMLTemplateElement, model: any, key: string, binding: ListBinding): void {
+    const _updateListBinding = function(bindingTreeNode: BindingTreeNode, view: HTMLTemplateElement, model: any, key: string, binding: ListBinding): void {
         if (view.parentElement === null) {
             return;
         }
         
         for (const listItem of binding.listItems) {
             listItem.remove();
+            const childBindingTreeNode = (listItem as any)[BINDING_TREE_NODE_PROPERTY];
+            const childIndex = bindingTreeNode.children.indexOf(childBindingTreeNode);
+            if (childIndex !== -1) {
+                bindingTreeNode.children.splice(childIndex, 1);
+            }
         }
         
         binding.listItems = [];
@@ -200,7 +217,7 @@ const ZipTie = (function(){
             const listItem = view.parentElement.lastElementChild as HTMLElement;
             binding.listItems.push(listItem);
             const listItemModel = { ...model, [binding.listVariable]: value };
-            _bind(listItem, listItemModel, context);
+            _bind(listItem, listItemModel, bindingTreeNode);
         }
     };
 

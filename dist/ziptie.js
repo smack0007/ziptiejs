@@ -1,5 +1,8 @@
 "use strict";
 const ZipTie = (function () {
+    const BINDING_TREE_NODE_PROPERTY = "z-bind";
+    const OPEN_PLACEHOLDER = "{{";
+    const CLOSE_PLACEHOLDER = "}}";
     let BindingType;
     (function (BindingType) {
         BindingType[BindingType["value"] = 0] = "value";
@@ -20,11 +23,11 @@ const ZipTie = (function () {
         }
         return map;
     })();
-    const _createBindingTreeNode = function (parent, updateView) {
+    const _createBindingTreeNode = function (parent, update) {
         const node = {
             parent,
             children: [],
-            updateView,
+            update,
             getRoot: function () {
                 let root = this;
                 while (root.parent !== undefined) {
@@ -39,7 +42,7 @@ const ZipTie = (function () {
         return node;
     };
     const _bind = function (view, model, parent) {
-        let context = view["z-context"];
+        let context = view[BINDING_TREE_NODE_PROPERTY];
         if (context === undefined) {
             const bindings = {};
             context = _createBindingTreeNode(parent, function () {
@@ -54,10 +57,13 @@ const ZipTie = (function () {
                     }
                 }
                 for (const child of context.children) {
-                    child.updateView();
+                    child.update();
+                }
+                if (context.parent === undefined) {
+                    console.debug(context);
                 }
             });
-            view["z-context"] = context;
+            view[BINDING_TREE_NODE_PROPERTY] = context;
             for (let i = 0; i < view.attributes.length; i++) {
                 const attribute = view.attributes[i];
                 if (attribute.name.startsWith(":")) {
@@ -78,7 +84,7 @@ const ZipTie = (function () {
                     const eventName = "on" + attribute.name.substring(1);
                     const eventHandler = function (...args) {
                         model[attribute.value](...args);
-                        context.getRoot().updateView();
+                        context.getRoot().update();
                     };
                     view[_attributeNameMap[eventName]] = eventHandler;
                 }
@@ -93,31 +99,36 @@ const ZipTie = (function () {
                 }
             }
         }
-        context.updateView();
+        context.update();
     };
     const _bindText = function (view, model, parent) {
         let text = "";
         if (view.textContent) {
             text = view.textContent.trim();
         }
-        if (!text.startsWith("{{") || !text.endsWith("}}")) {
+        if (!text.startsWith(OPEN_PLACEHOLDER) || !text.endsWith(CLOSE_PLACEHOLDER)) {
             return;
         }
-        let context = view["z-context"];
+        let context = view[BINDING_TREE_NODE_PROPERTY];
         if (context === undefined) {
-            const key = text.substring("{{".length, text.length - "}}".length).trim();
+            const key = text.substring(OPEN_PLACEHOLDER.length, text.length - CLOSE_PLACEHOLDER.length).trim();
             context = _createBindingTreeNode(parent, function () {
                 view.textContent = model[key];
             });
         }
-        context.updateView();
+        context.update();
     };
-    const _updateListBinding = function (context, view, model, key, binding) {
+    const _updateListBinding = function (bindingTreeNode, view, model, key, binding) {
         if (view.parentElement === null) {
             return;
         }
         for (const listItem of binding.listItems) {
             listItem.remove();
+            const childBindingTreeNode = listItem[BINDING_TREE_NODE_PROPERTY];
+            const childIndex = bindingTreeNode.children.indexOf(childBindingTreeNode);
+            if (childIndex !== -1) {
+                bindingTreeNode.children.splice(childIndex, 1);
+            }
         }
         binding.listItems = [];
         for (const value of model[binding.source]) {
@@ -125,7 +136,7 @@ const ZipTie = (function () {
             const listItem = view.parentElement.lastElementChild;
             binding.listItems.push(listItem);
             const listItemModel = Object.assign(Object.assign({}, model), { [binding.listVariable]: value });
-            _bind(listItem, listItemModel, context);
+            _bind(listItem, listItemModel, bindingTreeNode);
         }
     };
     const _updateValueBinding = function (context, view, model, key, binding) {
