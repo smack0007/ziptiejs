@@ -6,16 +6,28 @@
     <body>
         <div id="app">
             <h1 :innerHTML="name" @click="onClick"></h1>
-            <span :innerHtml="clickCount"></span>
+            <span :innerHTML="clickCount"></span>
+
+            <ul>
+                <template %item="items">
+                    <li :innerHTML="item"></li>
+                </template>
+            </ul>
         </div>
-        <script type="text/javascript" src="../dist/ziptie.js"></script>        
-        <script type="text/javascript">
+        <script src="../dist/ziptie.js"></script>        
+        <script>
             ZipTie.bind("#app", {
                 name: "Zachary Snow",
                 clickCount: 0,
+                items: [
+                    "Foo",
+                    "Bar",
+                    "Baz"
+                ],
                 onClick: function() {
                     this.clickCount++;
                     console.info("Hello " + this.name, this.clickCount);
+                    this.items.push("Items " + this.clickCount);
                 }
             });
         </script>
