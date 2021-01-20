@@ -43,7 +43,7 @@ const ZipTie = (function(){
         update(): void;
     }
 
-    const _attributeNameMap = (function(): AttributeNameMap {
+    const _attributeNameMap = (function(): AttributeNameMap {        
         const typesToScan = [
             EventTarget.prototype,
             Node.prototype,
@@ -241,6 +241,10 @@ const ZipTie = (function(){
             }
 
             _bind(view, model);
+        },
+
+        parse: function(input: string): string {
+            return input;
         }
     }
 })();

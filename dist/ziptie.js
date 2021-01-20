@@ -9,6 +9,9 @@ const ZipTie = (function () {
         BindingType[BindingType["list"] = 1] = "list";
     })(BindingType || (BindingType = {}));
     const _attributeNameMap = (function () {
+        if (typeof window === "undefined") {
+            return {};
+        }
         const typesToScan = [
             EventTarget.prototype,
             Node.prototype,
@@ -152,6 +155,9 @@ const ZipTie = (function () {
                 }
             }
             _bind(view, model);
+        },
+        parse: function (input) {
+            return input;
         }
     };
 })();

@@ -1,0 +1,34 @@
+{
+  "name": "ziptiejs",
+  "version": "0.0.1",
+  "description": "Simple databinding library.",
+  "main": "./src/ziptie.ts",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/smack0007/ziptiejs.git"
+  },
+  "keywords": [
+    "databinding"
+  ],
+  "author": "smack0007",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/smack0007/ziptiejs/issues"
+  },
+  "homepage": "https://github.com/smack0007/ziptiejs#readme",
+  "devDependencies": {
+    "@types/jasmine": "^3.6.3",
+    "jasmine": "^3.6.3",
+    "karma": "^6.0.0",
+    "karma-chrome-launcher": "^3.1.0",
+    "karma-jasmine": "^4.0.1",
+    "karma-spec-reporter": "0.0.32",
+    "typescript": "^4.1.3"
+  }
+}

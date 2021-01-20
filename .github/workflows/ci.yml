@@ -14,5 +14,11 @@ jobs:
         with:
           node-version: 14.8.0
       
-      - name: Run TypeScript 4.1.3
-        run: npx -p typescript@4.1.3 tsc --listEmittedFiles
+      - name: Restore
+        run: npm i
+
+      - name: Build
+        run: npx tsc --listEmittedFiles
+
+      - name: Test
+        run: npx karma start .\karma.conf.js --single-run
