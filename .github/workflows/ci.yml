@@ -21,4 +21,6 @@ jobs:
         run: npx tsc --listEmittedFiles
 
       - name: Test
-        run: npx karma start karma.conf.js --single-run
+        run: |
+          npx tsc -p tsconfig.tests.json --listEmittedFiles
+          npx karma start karma.conf.js --single-run
