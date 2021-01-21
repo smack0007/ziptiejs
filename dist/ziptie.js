@@ -1,17 +1,14 @@
 "use strict";
 const ZipTie = (function () {
     const BINDING_TREE_NODE_PROPERTY = "z-bind";
-    const OPEN_PLACEHOLDER = "{{";
-    const CLOSE_PLACEHOLDER = "}}";
+    const OPEN_PLACEHOLDER = "{";
+    const CLOSE_PLACEHOLDER = "}";
     let BindingType;
     (function (BindingType) {
         BindingType[BindingType["value"] = 0] = "value";
         BindingType[BindingType["list"] = 1] = "list";
     })(BindingType || (BindingType = {}));
     const _attributeNameMap = (function () {
-        if (typeof window === "undefined") {
-            return {};
-        }
         const typesToScan = [
             EventTarget.prototype,
             Node.prototype,
@@ -62,9 +59,6 @@ const ZipTie = (function () {
                 for (const child of context.children) {
                     child.update();
                 }
-                if (context.parent === undefined) {
-                    console.debug(context);
-                }
             });
             view[BINDING_TREE_NODE_PROPERTY] = context;
             for (let i = 0; i < view.attributes.length; i++) {
@@ -107,16 +101,20 @@ const ZipTie = (function () {
     const _bindText = function (view, model, parent) {
         let text = "";
         if (view.textContent) {
-            text = view.textContent.trim();
+            text = view.textContent;
         }
-        if (!text.startsWith(OPEN_PLACEHOLDER) || !text.endsWith(CLOSE_PLACEHOLDER)) {
+        const parseResults = ZipTie.parseTextBinding(text);
+        if (parseResults.length <= 1) {
             return;
         }
         let context = view[BINDING_TREE_NODE_PROPERTY];
         if (context === undefined) {
-            const key = text.substring(OPEN_PLACEHOLDER.length, text.length - CLOSE_PLACEHOLDER.length).trim();
             context = _createBindingTreeNode(parent, function () {
-                view.textContent = model[key];
+                let newText = parseResults[0];
+                for (let i = 1; i < parseResults.length; i++) {
+                    newText = newText.replace(`{{${i}}}`, model[parseResults[i]]);
+                }
+                view.textContent = newText;
             });
         }
         context.update();
@@ -156,8 +154,34 @@ const ZipTie = (function () {
             }
             _bind(view, model);
         },
-        parse: function (input) {
-            return input;
+        parseTextBinding: function (input) {
+            const results = [""];
+            let startPlaceholder = -1;
+            let placeholderName = "";
+            for (let i = 0; i < input.length; i++) {
+                if (startPlaceholder === -1) {
+                    if (input[i] === OPEN_PLACEHOLDER && i + 1 < input.length && input[i + 1] === OPEN_PLACEHOLDER) {
+                        startPlaceholder = i + 2;
+                        i++;
+                    }
+                    else {
+                        results[0] += input[i];
+                    }
+                }
+                else {
+                    if (input[i] === CLOSE_PLACEHOLDER && i + 1 < input.length && input[i + 1] === CLOSE_PLACEHOLDER) {
+                        results[0] += OPEN_PLACEHOLDER + OPEN_PLACEHOLDER + results.length + CLOSE_PLACEHOLDER + CLOSE_PLACEHOLDER;
+                        results.push(placeholderName.trim());
+                        startPlaceholder = -1;
+                        placeholderName = "";
+                        i++;
+                    }
+                    else {
+                        placeholderName += input[i];
+                    }
+                }
+            }
+            return results;
         }
     };
 })();

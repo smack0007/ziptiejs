@@ -4,8 +4,8 @@ const ZipTie = (function(){
     //
 
     const BINDING_TREE_NODE_PROPERTY = "z-bind";
-    const OPEN_PLACEHOLDER = "{{";
-    const CLOSE_PLACEHOLDER = "}}";
+    const OPEN_PLACEHOLDER = "{";
+    const CLOSE_PLACEHOLDER = "}";
 
     //
     // Internal API
@@ -120,9 +120,10 @@ const ZipTie = (function(){
                     child.update();
                 }
 
-                if (context.parent === undefined) {
-                    console.debug(context);
-                }
+                // Use this sometimes to see how the binding tree updates
+                // if (context.parent === undefined) {
+                //     console.debug(context);
+                // }
             });
 
             (view as any)[BINDING_TREE_NODE_PROPERTY] = context;
@@ -176,20 +177,25 @@ const ZipTie = (function(){
         let text = "";
         
         if (view.textContent) {
-            text = view.textContent.trim();
+            text = view.textContent;
         }
 
-        // TODO: Add support for multiple placeholders
-        if (!text.startsWith(OPEN_PLACEHOLDER) || !text.endsWith(CLOSE_PLACEHOLDER)) {
+        const parseResults = ZipTie.parseTextBinding(text);
+        if (parseResults.length <= 1) {
             return;
         }
         
         let context = (view as any)[BINDING_TREE_NODE_PROPERTY] as BindingTreeNode;
 
         if (context === undefined) {
-            const key = text.substring(OPEN_PLACEHOLDER.length, text.length - CLOSE_PLACEHOLDER.length).trim();
             context = _createBindingTreeNode(parent, function() {
-                view.textContent = model[key];
+                let newText = parseResults[0];
+                
+                for (let i = 1; i < parseResults.length; i++) {                    
+                    newText = newText.replace(`{{${i}}}`, model[parseResults[i]]);
+                }
+
+                view.textContent = newText;
             });
         }
 
@@ -243,8 +249,33 @@ const ZipTie = (function(){
             _bind(view, model);
         },
 
-        parse: function(input: string): string {
-            return input;
+        parseTextBinding: function(input: string): string[] {
+            const results = [ "" ];
+
+            let startPlaceholder = -1;
+            let placeholderName = "";
+            for (let i = 0; i < input.length; i++) {
+                if (startPlaceholder === -1) {
+                    if (input[i] === OPEN_PLACEHOLDER && i + 1 < input.length && input[i + 1] === OPEN_PLACEHOLDER) {
+                        startPlaceholder = i + 2;
+                        i++;
+                    } else {
+                        results[0] += input[i];
+                    }
+                } else {
+                    if (input[i] === CLOSE_PLACEHOLDER && i + 1 < input.length && input[i + 1] === CLOSE_PLACEHOLDER) {
+                        results[0] += OPEN_PLACEHOLDER + OPEN_PLACEHOLDER + results.length + CLOSE_PLACEHOLDER + CLOSE_PLACEHOLDER;
+                        results.push(placeholderName.trim());
+                        startPlaceholder = -1;
+                        placeholderName = "";
+                        i++;
+                    } else {
+                        placeholderName += input[i];
+                    }
+                }
+            }
+            
+            return results;
         }
     }
 })();
