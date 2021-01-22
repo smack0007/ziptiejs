@@ -18,9 +18,7 @@ jobs:
         run: npm i
 
       - name: Build
-        run: npx tsc --listEmittedFiles
+        run: npm run build
 
       - name: Test
-        run: |
-          npx tsc -p tsconfig.tests.json --listEmittedFiles
-          npx karma start karma.conf.js --single-run
+        run: npm run test
