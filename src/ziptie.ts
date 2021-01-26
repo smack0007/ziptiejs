@@ -180,8 +180,8 @@ const ZipTie = (function(){
             text = view.textContent;
         }
 
-        const parseResults = ZipTie.parseTextBinding(text);
-        if (parseResults.length <= 1) {
+        const textBinding = ZipTie.parseTextBinding(text);
+        if (textBinding.length <= 1) {
             return;
         }
         
@@ -189,10 +189,10 @@ const ZipTie = (function(){
 
         if (context === undefined) {
             context = _createBindingTreeNode(parent, function() {
-                let newText = parseResults[0];
+                let newText = textBinding[0];
                 
-                for (let i = 1; i < parseResults.length; i++) {                    
-                    newText = newText.replace(`{{${i}}}`, model[parseResults[i]]);
+                for (let i = 1; i < textBinding.length; i++) {                    
+                    newText = newText.replace(`{{${i}}}`, model[textBinding[i]]);
                 }
 
                 view.textContent = newText;
