@@ -22,7 +22,7 @@ class ZipTie {
         return map;
     })();
 
-    public static bind(view: HTMLElement | string, model: any, parent?: any): void {
+    public static bind(view: HTMLElement | string, model: any): ZipTieBindingTree {
         if (typeof view === "string") {
             const selector = view as string;
             view = document.querySelector(view) as HTMLElement;
@@ -32,7 +32,7 @@ class ZipTie {
             }
         }
 
-        ZipTie._bind(view, model);
+        return ZipTie._bind(view, model);
     }
 
     private static _parseTextBinding(input: string): string[] {
@@ -64,7 +64,7 @@ class ZipTie {
         return results;
     }
 
-    public static _bind(view: HTMLElement, model: any, parent?: ZipTieBindingTreeNode): void {
+    public static _bind(view: HTMLElement, model: any, parent?: ZipTieBindingTreeNode): ZipTieBindingTree {
         let bindingTreeNode = (view as any)[BINDING_TREE_NODE_PROPERTY] as ZipTieBindingTreeNode;
 
         if (bindingTreeNode === undefined) {
@@ -129,6 +129,8 @@ class ZipTie {
         }
 
         bindingTreeNode.update();
+
+        return bindingTreeNode;
     }
 
     private static _bindText(view: Text, model: any, parent: ZipTieBindingTreeNode): void {
@@ -161,7 +163,11 @@ class ZipTie {
     }
 }
 
-class ZipTieBindingTreeNode {
+interface ZipTieBindingTree {
+    update(): void;
+}
+
+class ZipTieBindingTreeNode implements ZipTieBindingTree {
     public children: ZipTieBindingTreeNode[] = [];
     
     constructor(

@@ -3,7 +3,7 @@ const BINDING_TREE_NODE_PROPERTY = "z-bind";
 const OPEN_PLACEHOLDER = "{";
 const CLOSE_PLACEHOLDER = "}";
 class ZipTie {
-    static bind(view, model, parent) {
+    static bind(view, model) {
         if (typeof view === "string") {
             const selector = view;
             view = document.querySelector(view);
@@ -11,7 +11,7 @@ class ZipTie {
                 throw new Error(`Failed to fetch a DOM element with the selector "${selector}".`);
             }
         }
-        ZipTie._bind(view, model);
+        return ZipTie._bind(view, model);
     }
     static _parseTextBinding(input) {
         const results = [""];
@@ -85,6 +85,7 @@ class ZipTie {
             }
         }
         bindingTreeNode.update();
+        return bindingTreeNode;
     }
     static _bindText(view, model, parent) {
         let text = "";
