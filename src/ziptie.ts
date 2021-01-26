@@ -35,7 +35,7 @@ class ZipTie {
         ZipTie._bind(view, model);
     }
 
-    public static parseTextBinding(input: string): string[] {
+    private static _parseTextBinding(input: string): string[] {
         const results = [ "" ];
 
         let startPlaceholder = -1;
@@ -138,7 +138,7 @@ class ZipTie {
             text = view.textContent;
         }
 
-        const textBinding = ZipTie.parseTextBinding(text);
+        const textBinding = ZipTie._parseTextBinding(text);
         if (textBinding.length <= 1) {
             return;
         }

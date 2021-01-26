@@ -1,7 +1,7 @@
 /// <reference path="../src/ziptie.ts" />
 
 describe("ZipTie", () => {
-    describe("parseTextBinding", () => {
+    describe("_parseTextBinding", () => {
         const tests: { input: string, expected: string[] }[] = [
             {
                 input: "No variables to replace here.",
@@ -25,7 +25,7 @@ describe("ZipTie", () => {
             const testName = `"${test.input}" => [ ${test.expected.map(x => `"${x}"`).join(",")} ]`;
 
             it (testName, () => {
-                expect(ZipTie.parseTextBinding(test.input)).toEqual(test.expected);
+                expect(ZipTie["_parseTextBinding"](test.input)).toEqual(test.expected);
             });
         }
     });
