@@ -8,7 +8,8 @@
   },
   "scripts": {
     "build": "tsc --listEmittedFiles",
-    "test": "tsc --listEmittedFiles -p tsconfig.tests.json && karma start karma.conf.js --single-run"
+    "test": "tsc --listEmittedFiles -p tsconfig.tests.json && karma start karma.conf.js --single-run",
+    "build-watch": "npm run build -- --watch"
   },
   "repository": {
     "type": "git",

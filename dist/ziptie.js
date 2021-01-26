@@ -53,9 +53,6 @@ class ZipTie {
                 for (const child of bindingTreeNode.children) {
                     child.update();
                 }
-                if (bindingTreeNode.parent === undefined) {
-                    console.debug(bindingTreeNode);
-                }
             });
             view[BINDING_TREE_NODE_PROPERTY] = bindingTreeNode;
             for (let i = 0; i < view.attributes.length; i++) {
@@ -80,7 +77,7 @@ class ZipTie {
             for (let i = 0; i < view.childNodes.length; i++) {
                 const childNode = view.childNodes[i];
                 if (childNode.nodeType === Node.ELEMENT_NODE) {
-                    ZipTie.bind(childNode, model, bindingTreeNode);
+                    ZipTie._bind(childNode, model, bindingTreeNode);
                 }
                 else if (childNode.nodeType === Node.TEXT_NODE) {
                     ZipTie._bindText(childNode, model, bindingTreeNode);
@@ -162,7 +159,6 @@ class ZipTieListBinding extends ZipTieValueBinding {
         this.listItems = [];
     }
     update(view, model) {
-        console.info(this);
         if (view.parentElement === null) {
             return;
         }

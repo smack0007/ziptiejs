@@ -80,9 +80,9 @@ class ZipTie {
                 }
 
                 // Use this sometimes to see how the binding tree updates
-                if (bindingTreeNode.parent === undefined) {
-                    console.debug(bindingTreeNode);
-                }
+                // if (bindingTreeNode.parent === undefined) {
+                //     console.debug(bindingTreeNode);
+                // }
             });
 
             (view as any)[BINDING_TREE_NODE_PROPERTY] = bindingTreeNode;
@@ -121,7 +121,7 @@ class ZipTie {
                 const childNode = view.childNodes[i];
 
                 if (childNode.nodeType === Node.ELEMENT_NODE) {
-                    ZipTie.bind(childNode as HTMLElement, model, bindingTreeNode);
+                    ZipTie._bind(childNode as HTMLElement, model, bindingTreeNode);
                 } else if (childNode.nodeType === Node.TEXT_NODE) {
                     ZipTie._bindText(childNode as Text, model, bindingTreeNode);
                 }
@@ -212,9 +212,7 @@ class ZipTieListBinding extends ZipTieValueBinding {
         super("", modelKey);
     }
 
-    public update(view: HTMLTemplateElement, model: any): void {
-        console.info(this);
-        
+    public update(view: HTMLTemplateElement, model: any): void {        
         if (view.parentElement === null) {
             return;
         }
