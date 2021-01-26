@@ -1,49 +1,9 @@
-const ZipTie = (function(){
-    //
-    // Constants
-    //
+const BINDING_TREE_NODE_PROPERTY = "z-bind";
+const OPEN_PLACEHOLDER = "{";
+const CLOSE_PLACEHOLDER = "}";
 
-    const BINDING_TREE_NODE_PROPERTY = "z-bind";
-    const OPEN_PLACEHOLDER = "{";
-    const CLOSE_PLACEHOLDER = "}";
-
-    //
-    // Internal API
-    //
-
-    type AttributeNameMap = { [key: string]: string };
-
-    enum BindingType {
-        value,
-
-        list
-    }
-
-    interface Binding {
-        type: BindingType;
-
-        source: string;
-    }
-
-    interface ListBinding extends Binding {
-        listVariable: string;
-        
-        listItems: HTMLElement[];
-    }
-
-    type BindingsMap = { [key: string]: Binding };
-
-    interface BindingTreeNode {
-        parent: BindingTreeNode | undefined;
-
-        children: BindingTreeNode[];
-
-        getRoot(): BindingTreeNode;
-
-        update(): void;
-    }
-
-    const _attributeNameMap = (function(): AttributeNameMap {        
+class ZipTie {
+    private static readonly _attributeNameMap = (function(): { [key: string]: string } {        
         const typesToScan = [
             EventTarget.prototype,
             Node.prototype,
@@ -51,100 +11,98 @@ const ZipTie = (function(){
             HTMLElement.prototype
         ];
         
-        const map: AttributeNameMap = {};
-
+        const map: { [key: string]: string } = {};
+    
         for (const type of typesToScan) {
             for (const key of Object.keys(type)) {
                 map[key.toLowerCase()] = key;
             }
         }
-
+    
         return map;
     })();
 
-    const _createBindingTreeNode = function(parent: BindingTreeNode | undefined, update: () => void): BindingTreeNode {
-        const node = {
-            parent,
-            children: [],
-            update,
-            getRoot: function() {  
-                let root = this;
+    public static bind(view: HTMLElement | string, model: any, parent?: any): void {
+        if (typeof view === "string") {
+            const selector = view as string;
+            view = document.querySelector(view) as HTMLElement;
 
-                while (root.parent !== undefined) {
-                    root = root.parent;
-                }
-
-                return root;
+            if (view === null) {
+                throw new Error(`Failed to fetch a DOM element with the selector "${selector}".`);
             }
-        } as BindingTreeNode;
-
-        if (parent !== undefined) {
-            parent.children.push(node);
         }
 
-        return node;
-    };
+        ZipTie._bind(view, model);
+    }
 
-    const _bind = function(view: HTMLElement, model: any, parent?: BindingTreeNode): void {
-        let context = (view as any)[BINDING_TREE_NODE_PROPERTY] as BindingTreeNode;
+    public static parseTextBinding(input: string): string[] {
+        const results = [ "" ];
 
-        if (context === undefined) {
-            const bindings: BindingsMap = {};
+        let startPlaceholder = -1;
+        let placeholderName = "";
+        for (let i = 0; i < input.length; i++) {
+            if (startPlaceholder === -1) {
+                if (input[i] === OPEN_PLACEHOLDER && i + 1 < input.length && input[i + 1] === OPEN_PLACEHOLDER) {
+                    startPlaceholder = i + 2;
+                    i++;
+                } else {
+                    results[0] += input[i];
+                }
+            } else {
+                if (input[i] === CLOSE_PLACEHOLDER && i + 1 < input.length && input[i + 1] === CLOSE_PLACEHOLDER) {
+                    results[0] += OPEN_PLACEHOLDER + OPEN_PLACEHOLDER + results.length + CLOSE_PLACEHOLDER + CLOSE_PLACEHOLDER;
+                    results.push(placeholderName.trim());
+                    startPlaceholder = -1;
+                    placeholderName = "";
+                    i++;
+                } else {
+                    placeholderName += input[i];
+                }
+            }
+        }
+        
+        return results;
+    }
 
-            context = _createBindingTreeNode(parent, function() {
+    public static _bind(view: HTMLElement, model: any, parent?: ZipTieBindingTreeNode): void {
+        let bindingTreeNode = (view as any)[BINDING_TREE_NODE_PROPERTY] as ZipTieBindingTreeNode;
+
+        if (bindingTreeNode === undefined) {
+            const bindings: { [key: string]: ZipTieBinding } = {};
+
+            bindingTreeNode = new ZipTieBindingTreeNode(parent, bindings, function() {
                 for (const key of Object.keys(bindings)) {
-                    switch (bindings[key].type) {
-                        case BindingType.value:
-                            _updateValueBinding(
-                                context,
-                                view,
-                                model,
-                                key,
-                                bindings[key]
-                            );
-                            break;
-
-                        case BindingType.list:
-                            _updateListBinding(
-                                context,
-                                view as HTMLTemplateElement,
-                                model,
-                                key,
-                                bindings[key] as ListBinding
-                            );
-                            break;
-                    }
+                    bindings[key].update(view, model);
                 }
 
-                for (const child of context.children) {
+                for (const child of bindingTreeNode.children) {
                     child.update();
                 }
 
                 // Use this sometimes to see how the binding tree updates
-                // if (context.parent === undefined) {
-                //     console.debug(context);
-                // }
+                if (bindingTreeNode.parent === undefined) {
+                    console.debug(bindingTreeNode);
+                }
             });
 
-            (view as any)[BINDING_TREE_NODE_PROPERTY] = context;
+            (view as any)[BINDING_TREE_NODE_PROPERTY] = bindingTreeNode;
 
             for (let i = 0; i < view.attributes.length; i++) {
                 const attribute = view.attributes[i];
 
                 if (attribute.name.startsWith(":")) {
-                    bindings[_attributeNameMap[attribute.name.substring(1)]] = {
-                        type: BindingType.value,
-                        source: attribute.value
-                    };
+                    bindings[ZipTie._attributeNameMap[attribute.name.substring(1)]] =
+                        new ZipTieValueBinding(
+                            ZipTie._attributeNameMap[attribute.name.substring(1)],
+                            attribute.value);
                 }
 
                 if (attribute.name.startsWith("%")) {
-                    bindings[_attributeNameMap[attribute.name.substring(1)]] = {
-                        type: BindingType.list,
-                        source: attribute.value,
-                        listVariable: attribute.name.substring(1),
-                        listItems: [],
-                    } as ListBinding;
+                    bindings[ZipTie._attributeNameMap[attribute.name.substring(1)]] =
+                        new ZipTieListBinding(
+                            bindingTreeNode,
+                            attribute.name.substring(1),
+                            attribute.value);
                 }
 
                 if (attribute.name.startsWith("@")) {
@@ -152,10 +110,10 @@ const ZipTie = (function(){
                     
                     const eventHandler = function(...args: any[]) {
                         model[attribute.value](...args);
-                        context.getRoot().update();
+                        bindingTreeNode.getRoot().update();
                     };
                     
-                    (view as any)[_attributeNameMap[eventName]] = eventHandler;
+                    (view as any)[ZipTie._attributeNameMap[eventName]] = eventHandler;
                 }
             }
 
@@ -163,17 +121,17 @@ const ZipTie = (function(){
                 const childNode = view.childNodes[i];
 
                 if (childNode.nodeType === Node.ELEMENT_NODE) {
-                    _bind(childNode as HTMLElement, model, context);
+                    ZipTie.bind(childNode as HTMLElement, model, bindingTreeNode);
                 } else if (childNode.nodeType === Node.TEXT_NODE) {
-                    _bindText(childNode as Text, model, context);
+                    ZipTie._bindText(childNode as Text, model, bindingTreeNode);
                 }
             }
         }
 
-        context.update();
-    };
+        bindingTreeNode.update();
+    }
 
-    const _bindText = function(view: Text, model: any, parent: BindingTreeNode): void {
+    private static _bindText(view: Text, model: any, parent: ZipTieBindingTreeNode): void {
         let text = "";
         
         if (view.textContent) {
@@ -185,10 +143,10 @@ const ZipTie = (function(){
             return;
         }
         
-        let context = (view as any)[BINDING_TREE_NODE_PROPERTY] as BindingTreeNode;
+        let context = (view as any)[BINDING_TREE_NODE_PROPERTY] as ZipTieBindingTreeNode;
 
         if (context === undefined) {
-            context = _createBindingTreeNode(parent, function() {
+            context = new ZipTieBindingTreeNode(parent, textBinding, function() {
                 let newText = textBinding[0];
                 
                 for (let i = 1; i < textBinding.length; i++) {                    
@@ -200,82 +158,84 @@ const ZipTie = (function(){
         }
 
         context.update();
-    };
+    }
+}
 
-    const _updateListBinding = function(bindingTreeNode: BindingTreeNode, view: HTMLTemplateElement, model: any, key: string, binding: ListBinding): void {
+class ZipTieBindingTreeNode {
+    public children: ZipTieBindingTreeNode[] = [];
+    
+    constructor(
+        public parent: ZipTieBindingTreeNode | undefined,
+        public bindings: any,
+        public update: () => void,
+    ) {
+        if (parent !== undefined) {
+            parent.children.push(this);
+        }
+    }
+
+    public getRoot(): ZipTieBindingTreeNode {  
+        let root: ZipTieBindingTreeNode = this;
+
+        while (root.parent !== undefined) {
+            root = root.parent;
+        }
+
+        return root;
+    };
+}
+
+interface ZipTieBinding {
+    update(view: HTMLElement, model: any): void;
+}
+
+class ZipTieValueBinding implements ZipTieBinding {
+    constructor(
+        public readonly viewKey: string,
+        public readonly modelKey: string,
+    ) {
+    }
+    
+    public update(view: HTMLElement, model: any): void {
+        (view as any)[this.viewKey] = model[this.modelKey];
+    }
+}
+
+class ZipTieListBinding extends ZipTieValueBinding {
+    public listItems: HTMLElement[] = [];
+    
+    constructor(
+        public readonly bindingTreeNode: ZipTieBindingTreeNode,
+        public readonly listVariable: string,
+        modelKey: string
+    ) {
+        super("", modelKey);
+    }
+
+    public update(view: HTMLTemplateElement, model: any): void {
+        console.info(this);
+        
         if (view.parentElement === null) {
             return;
         }
         
-        for (const listItem of binding.listItems) {
+        for (const listItem of this.listItems) {
             listItem.remove();
             const childBindingTreeNode = (listItem as any)[BINDING_TREE_NODE_PROPERTY];
-            const childIndex = bindingTreeNode.children.indexOf(childBindingTreeNode);
+            const childIndex = this.bindingTreeNode.children.indexOf(childBindingTreeNode);
             if (childIndex !== -1) {
-                bindingTreeNode.children.splice(childIndex, 1);
+                this.bindingTreeNode.children.splice(childIndex, 1);
             }
         }
         
-        binding.listItems = [];
+        this.listItems = [];
 
-        for (const value of model[binding.source]) {
+        for (const value of model[this.modelKey]) {
             view.parentElement.appendChild(view.content.cloneNode(true)) as HTMLElement;
             const listItem = view.parentElement.lastElementChild as HTMLElement;
-            binding.listItems.push(listItem);
-            const listItemModel = { ...model, [binding.listVariable]: value };
-            _bind(listItem, listItemModel, bindingTreeNode);
-        }
-    };
-
-    const _updateValueBinding = function(context: BindingTreeNode, view: any, model: any, key: string, binding: Binding): void {
-        view[key] = model[binding.source];
-    };
-
-    //
-    // Public API
-    //
-
-    return {
-        bind: function(view: HTMLElement | string, model: any, parent?: any): void {
-            if (typeof view === "string") {
-                const selector = view as string;
-                view = document.querySelector(view) as HTMLElement;
-
-                if (view === null) {
-                    throw new Error(`Failed to fetch a DOM element with the selector "${selector}".`);
-                }
-            }
-
-            _bind(view, model);
-        },
-
-        parseTextBinding: function(input: string): string[] {
-            const results = [ "" ];
-
-            let startPlaceholder = -1;
-            let placeholderName = "";
-            for (let i = 0; i < input.length; i++) {
-                if (startPlaceholder === -1) {
-                    if (input[i] === OPEN_PLACEHOLDER && i + 1 < input.length && input[i + 1] === OPEN_PLACEHOLDER) {
-                        startPlaceholder = i + 2;
-                        i++;
-                    } else {
-                        results[0] += input[i];
-                    }
-                } else {
-                    if (input[i] === CLOSE_PLACEHOLDER && i + 1 < input.length && input[i + 1] === CLOSE_PLACEHOLDER) {
-                        results[0] += OPEN_PLACEHOLDER + OPEN_PLACEHOLDER + results.length + CLOSE_PLACEHOLDER + CLOSE_PLACEHOLDER;
-                        results.push(placeholderName.trim());
-                        startPlaceholder = -1;
-                        placeholderName = "";
-                        i++;
-                    } else {
-                        placeholderName += input[i];
-                    }
-                }
-            }
-            
-            return results;
+            this.listItems.push(listItem);
+            const listItemModel = { ...model, [this.listVariable]: value };
+            ZipTie._bind(listItem, listItemModel, this.bindingTreeNode);
         }
     }
-})();
+}
